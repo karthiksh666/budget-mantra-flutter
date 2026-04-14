@@ -28,16 +28,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (!mounted) return;
     setState(() { _error = null; _loading = true; });
     try {
       await ref.read(authProvider.notifier).login(
         _emailCtrl.text.trim(),
         _passwordCtrl.text,
       );
+      // Success: GoRouter handles navigation — do NOT setState (widget is being disposed)
     } catch (e) {
-      setState(() { _error = e.toString().replaceFirst('Exception: ', ''); });
-    } finally {
-      if (mounted) setState(() { _loading = false; });
+      if (!mounted) return;
+      setState(() {
+        _error = e.toString().replaceFirst('Exception: ', '');
+        _loading = false;
+      });
     }
   }
 
