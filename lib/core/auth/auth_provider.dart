@@ -1,5 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../api/api_client.dart';
 
 class AuthState {
@@ -25,16 +25,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _restore();
   }
 
-  final _storage = const FlutterSecureStorage();
+  static const _tokenKey = 'bm_token';
 
   Future<void> _restore() async {
     try {
-      final token = await _storage.read(key: 'bm_token');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_tokenKey);
       if (token == null) { state = const AuthState(); return; }
       final user = await ApiClient.instance.getMe();
       state = AuthState(user: user, token: token);
     } catch (_) {
-      await _storage.delete(key: 'bm_token');
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_tokenKey);
       state = const AuthState();
     }
   }
@@ -44,7 +46,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final res = await ApiClient.instance.login(email, password);
       final token = res['access_token'] as String;
-      await _storage.write(key: 'bm_token', value: token);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_tokenKey, token);
       final user = await ApiClient.instance.getMe();
       state = AuthState(user: user, token: token);
     } catch (e) {
@@ -59,7 +62,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final res = await ApiClient.instance.signup(name, email, password);
       final token = res['access_token'] as String?;
       if (token != null) {
-        await _storage.write(key: 'bm_token', value: token);
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_tokenKey, token);
         final user = await ApiClient.instance.getMe();
         state = AuthState(user: user, token: token);
       } else {
@@ -73,7 +77,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
-    await _storage.delete(key: 'bm_token');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_tokenKey);
     state = const AuthState();
   }
 
