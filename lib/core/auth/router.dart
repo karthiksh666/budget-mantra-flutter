@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'auth_provider.dart';
@@ -15,21 +16,40 @@ import '../../features/auth/signup_screen.dart';
 import '../../features/more/more_screen.dart';
 import '../shell/main_shell.dart';
 
+// RouterNotifier listens to auth changes and tells GoRouter to re-evaluate
+// its redirect — without recreating the GoRouter itself.
+class _RouterNotifier extends ChangeNotifier {
+  final Ref _ref;
+
+  _RouterNotifier(this._ref) {
+    _ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+  }
+
+  String? redirect(BuildContext context, GoRouterState state) {
+    final auth = _ref.read(authProvider);
+    if (auth.loading) return null;
+
+    final loggedIn = auth.isLoggedIn;
+    final onAuthPage = state.matchedLocation == '/login' ||
+        state.matchedLocation == '/signup';
+
+    if (!loggedIn && !onAuthPage) return '/login';
+    if (loggedIn && onAuthPage) return '/';
+    return null;
+  }
+}
+
+final _routerNotifierProvider = ChangeNotifierProvider<_RouterNotifier>(
+  (ref) => _RouterNotifier(ref),
+);
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authProvider);
+  final notifier = ref.watch(_routerNotifierProvider);
 
   return GoRouter(
     initialLocation: '/',
-    redirect: (context, state) {
-      if (auth.loading) return null;
-      final loggedIn = auth.isLoggedIn;
-      final onAuthPage = state.matchedLocation == '/login' ||
-          state.matchedLocation == '/signup';
-
-      if (!loggedIn && !onAuthPage) return '/login';
-      if (loggedIn && onAuthPage) return '/';
-      return null;
-    },
+    refreshListenable: notifier,
+    redirect: notifier.redirect,
     routes: [
       // Auth
       GoRoute(path: '/login',  builder: (_, __) => const LoginScreen()),
@@ -39,11 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => MainShell(child: child),
         routes: [
-          GoRoute(path: '/',             builder: (_, __) => const DashboardScreen()),
-          GoRoute(path: '/alerts',       builder: (_, __) => const NotificationsScreen()),
-          GoRoute(path: '/chat',         builder: (_, __) => const ChatbotScreen()),
-          GoRoute(path: '/expenses',     builder: (_, __) => const BudgetScreen()),
-          GoRoute(path: '/more',         builder: (_, __) => const MoreScreen()),
+          GoRoute(path: '/',        builder: (_, __) => const DashboardScreen()),
+          GoRoute(path: '/alerts',  builder: (_, __) => const NotificationsScreen()),
+          GoRoute(path: '/chat',    builder: (_, __) => const ChatbotScreen()),
+          GoRoute(path: '/expenses',builder: (_, __) => const BudgetScreen()),
+          GoRoute(path: '/more',    builder: (_, __) => const MoreScreen()),
         ],
       ),
 
